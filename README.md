@@ -1,20 +1,26 @@
-# Animation Master
+# Animastery
 
-A comprehensive animation tool that combines style visualization and pose generation capabilities. This tool helps animators and artists understand different animation styles and generate character poses.
+A comprehensive 2D animation and character design system that combines style visualization, character sprite generation, and animation capabilities. This tool helps animators and artists create detailed character sprites with various animations and poses.
 
 ## Features
 
-### Style Sketcher
+### Character Sprite Generator
+- Customizable character designs
+- Detailed facial features and expressions
+- Weapon and accessory customization
+- Multiple animation frames for smooth movement
+
+### Animation System
+- Multiple animation states (idle, attack)
+- Smooth frame transitions
+- Character-specific animations
+- Real-time animation preview
+
+### Style Visualization
 - Seven distinct animation style presets
 - Real-time visual generation
 - Detailed style descriptions
 - Abstract visual representations
-
-### Pose Generator
-- Seven character pose presets
-- Real-time pose visualization
-- Detailed pose descriptions
-- Simple character skeleton representation
 
 ## Installation
 
@@ -26,34 +32,39 @@ A comprehensive animation tool that combines style visualization and pose genera
 
 ## Usage
 
-1. Run the application:
+1. Generate character sprites:
+   ```
+   python character_sprite_generator.py
+   ```
+
+2. View animations:
+   ```
+   python sprite_viewer.py
+   ```
+
+3. Run the main application:
    ```
    python main.py
    ```
-2. Switch between Style Sketcher and Pose Generator using the tabs
-3. Select different styles or poses from the dropdown menus
-4. View the generated visual representations
-5. Read the descriptions to understand the characteristics
 
-## Style Presets
+## Character System
 
-- **Fluid Motion, Soft Edges**: Smooth, flowing lines representing gentle character movements
-- **Bold Colors, High Contrast**: Strong geometric shapes with vibrant colors
-- **Minimalist, Clean Lines**: Simple, modern aesthetic with basic shapes
-- **Organic, Natural Flow**: Natural patterns suggesting lifelike movement
-- **Dynamic, Energetic**: Sharp angles and warm colors conveying energy
-- **Soft, Dreamlike**: Gentle gradients creating an ethereal feel
-- **Geometric, Structured**: Precise lines and regular patterns
+### Aaron
+- Red-themed character
+- Scythe weapon
+- Detailed facial features
+- Multiple animation states
 
-## Pose Presets
+### Mani
+- Blue-themed character
+- Energy blade weapon
+- Detailed facial features
+- Multiple animation states
 
-- **Idle**: A relaxed, natural standing pose
-- **Walking**: A dynamic walking pose with forward motion
-- **Running**: An energetic running pose with exaggerated movement
-- **Jumping**: A dynamic jumping pose with upward motion
-- **Sitting**: A relaxed sitting pose
-- **Action**: A dynamic action pose with strong lines
-- **Emotional**: An expressive pose showing emotion
+## Animation States
+
+- **Idle**: Relaxed standing pose with subtle movement
+- **Attack**: Dynamic combat animations with weapon effects
 
 ## License
 
