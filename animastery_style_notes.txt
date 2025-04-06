@@ -1,0 +1,70 @@
+## Character Design
+Characters should have expressive, large eyes that convey emotion effectively
+Character movements should be fluid and natural, especially during dance sequences
+Each character should have a distinct color palette that reflects their personality
+Costumes should be detailed and flow naturally with movement
+Hair animation should be dynamic and respond to character movement
+
+## Animation
+Dance sequences should be smooth and synchronized
+Use squash and stretch principles for dynamic movements
+Facial expressions should be exaggerated during comedic moments
+Maintain consistent character proportions throughout different scenes
+Timing and spacing should emphasize the musical rhythm
+
+## Background Art
+School environments should be detailed and based on real architecture
+Ocean scenes should capture the beauty of seaside locations
+Use atmospheric perspective for distant landscape shots
+Incorporate seasonal elements to show passage of time
+Lighting should enhance the mood of each scene
+
+## Special Effects
+Stage lighting effects should be vibrant and dynamic
+Use particle effects for magical transformations
+Water animation should be fluid and reflect light naturally
+Lens flares should enhance dramatic moments
+Special effects should not overshadow character animation
+
+## Color Palette
+Use warm colors for sunset scenes by the ocean
+School uniforms should maintain consistent colors
+Stage costume colors should pop against darker backgrounds
+Lighting should affect character and environment colors consistently
+Use color theory to convey mood and emotion in scenes
+
+Character Design:
+- Characters have large, expressive eyes with detailed highlights
+- Hair is drawn with flowing, dynamic lines and often has multiple colors
+- Character proportions are slightly stylized with emphasis on cuteness
+- Outfits are detailed with attention to fabric textures and patterns
+
+Character Movement:
+- Character movements are fluid and energetic, especially during dance sequences
+- The animation emphasizes dynamic poses and expressive gestures
+- During musical performances, the choreography is detailed and synchronized
+- Smooth transitions between movements create a sense of flow
+
+Color Palette:
+- Bright, vibrant colors are used for character designs
+- Pastel tones are common for background elements
+- High contrast is used to make characters stand out
+- Color gradients are often used for hair and clothing
+
+Facial Expressions:
+- Wide range of emotional expressions
+- Exaggerated features for comedic moments
+- Detailed eye animations for emotional scenes
+- Blush effects are commonly used
+
+Background Art:
+- Detailed school environments
+- Vibrant outdoor scenes
+- Soft lighting effects
+- Seasonal variations in color schemes
+
+Lighting and Effects:
+- Soft glow effects during emotional moments
+- Sparkle effects for magical sequences
+- Dynamic lighting during performances
+- Lens flare and light bloom in outdoor scenes 
