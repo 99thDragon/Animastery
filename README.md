@@ -1,124 +1,121 @@
-# Love Live! Sunshine!! Style Guide Assistant
+# Animastery
 
-A simple Retrieval-Augmented Generation (RAG) system with a graphical user interface designed to help learn and understand the animation style of Love Live! Sunshine!!. This tool allows users to search through a curated knowledge base of animation style information using natural language queries.
+Learn art styles by drawing. Animastery gives you guided line-work exercises, measures every stroke
+you make, and gives you coaching feedback on what to fix, with an AI coach on the back end.
 
-## Features
+## Art Coach (web app)
 
-- **Text-based Knowledge Base**: Stores comprehensive information about the Love Live! Sunshine!! animation style
-- **Keyword-based Search**: Simple but effective search functionality with case-insensitive matching
-- **GUI Interface**: User-friendly interface built with tkinter featuring:
-  - Clean, modern design
-  - Placeholder text for query examples
-  - Progress indicators
-  - Scrollable results area
-- **Keyword Highlighting**: Visual highlighting of search terms in results for better context
-- **Progress Indicator**: Visual feedback during search operations
+Pick an exercise, then trace over the guide (**Trace** mode) or study it for 4 seconds and draw it
+from memory (**Memory** mode). Press **Check my lines** to get:
 
-## Files Included
+- **A score breakdown** of your line work:
+  | Metric | What it measures |
+  |---|---|
+  | Accuracy | How far your line strays from the guide (average and 90th-percentile px) |
+  | Coverage | How much of the guide you actually drew, and which parts you skipped |
+  | Smoothness | Wobble/jitter in your line beyond the guide's own curvature |
+  | Confidence | One clean stroke per line vs. sketchy feathering, plus time spent hesitating |
+  | Line weight | Pen-pressure control: tapering (light-heavy-light) or evenness, depending on the exercise |
+  | Direction | Whether strokes were pulled the intended way (e.g. hair from root to tip) |
+- **An error heatmap** painted over your strokes (green = on the line, red = drifted)
+- **Coach feedback**: what you're doing well, the 1-3 most important fixes, a drill for each,
+  and a style note. When an Anthropic API key is configured, Claude looks at a snapshot of your
+  drawing plus the measured metrics. Without a key, the app gives rule-based tips instead.
+- **Progress tracking**: your best score per exercise is saved in the browser.
 
-- `simple_rag_gui.py`: Main GUI application with enhanced visual features
-- `simple_rag.py`: Original command-line version for basic functionality
-- `love_live_style_notes.txt`: Knowledge base containing detailed style information
-- `.gitignore`: Git configuration file for Python projects
-- `README.md`: Project documentation
+Exercises are grouped by style:
 
-## Installation
+- **Fundamentals**: confident straight lines, tilted ellipse, line of action (S-curve)
+- **Anime / idol style**: tapered hair strands, large anime eye, front-view anime face.
+  The AI coach uses `love_live_style_notes.txt` as its style reference here.
 
-1. **Prerequisites**:
-   - Python 3.x
-   - tkinter (usually comes with Python)
-   - No additional packages required
+A stylus (iPad + Pencil, Wacom, Surface pen) unlocks line-weight scoring. A mouse or finger works
+for everything else.
 
-2. **Setup**:
-   ```bash
-   # Clone the repository
-   git clone https://github.com/99thDragon/love-live-style-guide.git
-   cd love-live-style-guide
-   ```
+### Run it
 
-## How to Use
-
-1. **Running the Application**:
-   ```bash
-   python simple_rag_gui.py
-   ```
-
-2. **Using the Search**:
-   - Enter your query in the search box (e.g., "character movement")
-   - Click "Search" or press Enter
-   - View results with highlighted keywords
-   - Scroll through results if needed
-   - The progress indicator will show when the search is processing
-
-3. **Understanding Results**:
-   - Results are displayed in numbered format
-   - Keywords from your query are highlighted in yellow
-   - Each result is separated by blank lines for better readability
-
-## Example Queries
-
-Try these example queries to explore the style guide:
-- "character movement"
-- "color palette"
-- "facial expressions"
-- "background art"
-- "musical sequences"
-- "character design"
-
-## Project Structure
-
-```
-love-live-style-guide/
-├── README.md              # Project documentation
-├── simple_rag_gui.py     # Main GUI application
-├── simple_rag.py         # Command-line version
-├── love_live_style_notes.txt  # Knowledge base
-└── .gitignore            # Git configuration
+```bash
+python -m venv .venv
 ```
 
-## Contributing
+```bash
+.venv/bin/pip install -r requirements.txt
+```
 
-We welcome contributions! Here's how you can help:
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...   # optional, enables the AI coach
+```
 
-1. **Adding Style Information**:
-   - Edit `love_live_style_notes.txt` to add more style details
-   - Follow the existing format for consistency
+```bash
+.venv/bin/python -m artcoach.app
+```
 
-2. **Improving Search**:
-   - Enhance the search algorithm in `simple_rag_gui.py`
-   - Add more sophisticated matching techniques
+Then open http://localhost:5000.
 
-3. **GUI Enhancements**:
-   - Modify the interface in `simple_rag_gui.py`
-   - Add new visual features
-   - Improve user experience
+Settings (environment variables):
 
-4. **New Features**:
-   - Add image support
-   - Implement advanced search filters
-   - Add export functionality
+| Variable | Default | Purpose |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | (none) | Enables AI coaching. Without it you get offline tips. |
+| `ARTCOACH_AI` | `on` | Set to `off` to force offline tips |
+| `ARTCOACH_MODEL` | `claude-opus-5-5` | Claude model used for coaching |
+| `HOST` / `PORT` | `127.0.0.1` / `5000` | Where the server listens. Use `HOST=0.0.0.0` to draw from a tablet on your network. |
 
-## Development Workflow
+### Tests
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+### How it works
+
+```
+browser canvas (pointer events: x, y, time, pressure)
+   │  POST /api/score
+   ▼
+artcoach/scoring.py   resample strokes → compare to guide → per-skill metrics + heatmap
+   │  POST /api/coach  (metrics + PNG snapshot)
+   ▼
+artcoach/coach.py     Claude (vision + structured JSON output) → coaching feedback
+                      └─ falls back to rule-based tips if the API is unavailable
+```
+
+| Path | Purpose |
+|---|---|
+| `artcoach/app.py` | Flask server and API routes |
+| `artcoach/scoring.py` | Stroke analysis engine |
+| `artcoach/exercises.py` | Exercise definitions (guide strokes + teaching notes) |
+| `artcoach/coach.py` | AI coach and offline fallback |
+| `artcoach/static/` | Drawing UI (HTML/CSS/JS, no build step) |
+| `tests/` | Scoring and fallback tests |
+
+### Adding an exercise
+
+Add an entry to `EXERCISES` in `artcoach/exercises.py`. Guide strokes live in an 800×600 space
+and are built from the `line`, `ellipse` and `bezier` helpers. Set `pressure_profile`
+(`"taper"` or `"even"`) and `directional` to choose what gets scored.
+
+## Original style-guide search (legacy)
+
+The first version of this project is still here: a keyword search over
+`love_live_style_notes.txt`.
+
+```bash
+python simple_rag_gui.py    # tkinter GUI
+```
+
+```bash
+python simple_rag.py        # command line
+```
+
+## Roadmap
+
+- Upload your own reference image and auto-trace guide strokes from it
+- Auto-align memory drawings (score shape even if drawn shifted or scaled)
+- More styles: manga inking, chibi proportions, gesture drawing with timed poses
+- Per-exercise progress charts and spaced-repetition practice plans
+- Stroke-order replay comparing your stroke against an ideal one
 
 ## License
 
-This project is open source and available under the MIT License. See the LICENSE file for details.
-
-## Acknowledgments
-
-- Love Live! Sunshine!! for the inspiration
-- Python and tkinter for the development tools
-- The open-source community for their support
-
-## Future Plans
-
-- [ ] Add image support for visual examples
-- [ ] Implement semantic search capabilities
-- [ ] Create a web-based version
-- [ ] Add user authentication for collaborative editing
-- [ ] Develop a mobile app version 
+MIT

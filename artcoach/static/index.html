@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Animastery Art Coach</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Animastery <span>Art Coach</span></div>
+    <div class="tagline">Trace, draw from memory, and get your line work broken down stroke by stroke.</div>
+  </header>
+
+  <main class="layout">
+    <nav class="exercises" id="exercise-list" aria-label="Exercises"></nav>
+
+    <section class="studio">
+      <div class="studio-head">
+        <div>
+          <h1 id="ex-name">Loading…</h1>
+          <p id="ex-desc" class="muted"></p>
+        </div>
+        <div class="mode" role="radiogroup" aria-label="Practice mode">
+          <button class="mode-btn active" data-mode="trace" role="radio" aria-checked="true">Trace</button>
+          <button class="mode-btn" data-mode="memory" role="radio" aria-checked="false">Memory</button>
+        </div>
+      </div>
+
+      <div class="canvas-wrap">
+        <canvas id="canvas" width="800" height="600" aria-label="Drawing canvas"></canvas>
+        <div id="countdown" class="countdown" hidden></div>
+      </div>
+
+      <div class="toolbar">
+        <button id="undo">Undo</button>
+        <button id="clear">Clear</button>
+        <label class="toggle"><input type="checkbox" id="show-heat" checked> Error heatmap</label>
+        <span id="pen-status" class="muted small"></span>
+        <button id="submit" class="primary">Check my lines</button>
+      </div>
+
+      <ul id="ex-tips" class="tips"></ul>
+    </section>
+
+    <aside class="results" id="results">
+      <div class="empty muted">
+        <p>Draw over the guide, then press <strong>Check my lines</strong>.</p>
+        <p class="small">A stylus with pressure unlocks line-weight scoring.</p>
+      </div>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
