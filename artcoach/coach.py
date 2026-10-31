@@ -69,6 +69,120 @@ def _style_notes():
         return ""
 
 
+def _call_claude(system, content, schema):
+    """One structured-output request to Claude. Returns the parsed dict, or None if declined."""
+    import anthropic
+
+    client = anthropic.Anthropic()
+    response = client.beta.messages.create(
+        model=MODEL,
+        max_tokens=16000,
+        system=system,
+        messages=[{"role": "user", "content": content}],
+        output_config={
+            "effort": "medium",
+            "format": {"type": "json_schema", "schema": schema},
+        },
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+    )
+    if response.stop_reason == "refusal":
+        log.warning("Claude declined the request: %s", response.stop_details)
+        return None
+    text = next((b.text for b in response.content if b.type == "text"), None)
+    return json.loads(text) if text else None
+
+
+def _png_block(data_b64):
+    return {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data_b64}}
+
+
+# --------------------------------------------------------------------------- style analysis
+
+STYLE_SYSTEM_PROMPT = """You are an art teacher who helps students learn an art style by studying a \
+reference, the way art students do master studies.
+
+Analyze the visual style of the reference image: the technique and conventions, not the subject \
+matter or story. Describe what is observable so a student can reproduce the *style* in their own \
+original drawings: line quality and weight, how lines taper, shape language, proportions, how \
+signature features (eyes, hair, hands, faces, folds, etc.) are constructed, and color/shading \
+approach. Be concrete and visual ("upper lash line is a single heavy stroke that flicks out at the \
+outer corner"), not vague ("expressive eyes").
+
+Don't try to identify real people in the image. If the student named the artist, you can mention \
+widely known characteristics of their style, but ground everything in what this image shows.
+
+Then write a short, progressive lesson plan. Each step picks one exercise: one of the built-in \
+exercise ids, "reference-trace" (trace this reference's lines) or "reference-memory" (draw this \
+reference from memory). Order the steps from fundamentals to the full study."""
+
+
+def style_schema(exercise_ids):
+    return {
+        "type": "object",
+        "properties": {
+            "style_summary": {"type": "string"},
+            "line_work": {"type": "string"},
+            "shape_language": {"type": "string"},
+            "proportions": {"type": "string"},
+            "signature_features": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"feature": {"type": "string"}, "how_to_draw": {"type": "string"}},
+                    "required": ["feature", "how_to_draw"],
+                    "additionalProperties": False,
+                },
+            },
+            "color_and_shading": {"type": "string"},
+            "common_mistakes": {"type": "array", "items": {"type": "string"}},
+            "lesson_plan": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "exercise": {"type": "string",
+                                     "enum": list(exercise_ids) + ["reference-trace", "reference-memory"]},
+                        "focus": {"type": "string"},
+                    },
+                    "required": ["title", "exercise", "focus"],
+                    "additionalProperties": False,
+                },
+            },
+            "coaching_focus": {"type": "string"},
+        },
+        "required": ["style_summary", "line_work", "shape_language", "proportions",
+                     "signature_features", "color_and_shading", "common_mistakes",
+                     "lesson_plan", "coaching_focus"],
+        "additionalProperties": False,
+    }
+
+
+def analyze_style(image_png: bytes, name, artist, builtin_exercises):
+    """Ask Claude for a style profile + lesson plan. Returns (profile_or_None, source)."""
+    if not _ai_enabled():
+        return None, "disabled"
+    catalog = "\n".join(f"- {e['id']}: {e['name']} ({e['style']}). {e['description']}"
+                        for e in builtin_exercises)
+    content = [
+        _png_block(base64.b64encode(image_png).decode("ascii")),
+        {"type": "text", "text": (
+            f"Style reference name: {name}\n"
+            f"Artist / creator (as given by the student): {artist or 'not given'}\n\n"
+            f"Built-in exercises you can assign:\n{catalog}\n\n"
+            "Analyze this style and build the lesson plan."
+        )},
+    ]
+    try:
+        profile = _call_claude(STYLE_SYSTEM_PROMPT, content,
+                               style_schema([e["id"] for e in builtin_exercises]))
+    except Exception as exc:
+        log.warning("Style analysis unavailable: %s", exc)
+        return None, "unavailable"
+    return (profile, "claude") if profile else (None, "declined")
+
+
 def _metrics_for_prompt(result):
     """Metrics without the bulky heatmap."""
     return {
@@ -99,21 +213,22 @@ def get_feedback(exercise, result, image_data_url=None, mode="trace"):
 
 
 def _claude_feedback(exercise, result, image_data_url, mode):
-    import anthropic
-
-    client = anthropic.Anthropic()
-
     content = []
     if image_data_url and image_data_url.startswith("data:image/png;base64,"):
         data = image_data_url.split(",", 1)[1]
         base64.b64decode(data, validate=True)  # reject garbage before sending
-        content.append({
-            "type": "image",
-            "source": {"type": "base64", "media_type": "image/png", "data": data},
-        })
+        content.append(_png_block(data))
 
     style_block = ""
-    if exercise.get("style") != "Fundamentals":
+    if exercise.get("profile"):
+        by = f" by {exercise['artist']}" if exercise.get("artist") else ""
+        style_block = (f"\n\nThis is a study of an uploaded style reference{by}. The snapshot shows the "
+                       "faded reference under the student's lines. Style profile (JSON):\n"
+                       f"{json.dumps(exercise['profile'], indent=1)}")
+    elif exercise.get("style_id"):
+        style_block = ("\n\nThis is a study of an uploaded style reference (shown faded under the "
+                       "student's lines). Judge how well the student captured its line work.")
+    elif exercise.get("style") != "Fundamentals":
         style_block = f"\n\nStyle reference notes for this style:\n{_style_notes()}"
 
     content.append({
@@ -130,27 +245,7 @@ def _claude_feedback(exercise, result, image_data_url, mode):
             "Give your coaching feedback."
         ),
     })
-
-    response = client.beta.messages.create(
-        model=MODEL,
-        max_tokens=16000,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": content}],
-        output_config={
-            "effort": "medium",
-            "format": {"type": "json_schema", "schema": FEEDBACK_SCHEMA},
-        },
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-    )
-
-    if response.stop_reason == "refusal":
-        log.warning("AI feedback declined: %s", response.stop_details)
-        return None
-    text = next((b.text for b in response.content if b.type == "text"), None)
-    if not text:
-        return None
-    return json.loads(text)
+    return _call_claude(SYSTEM_PROMPT, content, FEEDBACK_SCHEMA)
 
 
 # --------------------------------------------------------------------------- offline

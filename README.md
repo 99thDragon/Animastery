@@ -32,6 +32,23 @@ Exercises are grouped by style:
 A stylus (iPad + Pencil, Wacom, Surface pen) unlocks line-weight scoring. A mouse or finger works
 for everything else.
 
+### Learn a new style from a reference
+
+Click **+ Learn a new style** and upload artwork in the style you want to learn, for example by a
+favorite creator. Enter the artist and source link and confirm it's for personal study.
+
+- **Claude breaks down the style:** line work and taper, shape language, proportions, how signature
+  features are drawn, color and shading, common mistakes, and a step-by-step **lesson plan** mixing
+  built-in drills with studies of the reference. Click any step to jump to it.
+- **The reference becomes an exercise.** Its line art is auto-traced into guide strokes. Trace over
+  the faded reference (adjust its opacity, or show the traced lines), or study it and draw it from
+  memory. Scoring and coaching work as usual, and the coach judges you against *that* style.
+- References stay on your computer in `data/styles/`. For analysis and coaching, images are sent
+  only to the Anthropic API. Clean line art and sketches trace best.
+
+Studying and tracing other artists' work is a classic way to learn, the same as a master study.
+Credit the artist, and don't post traces or copies as your own original work.
+
 ### Run it
 
 ```bash
@@ -85,7 +102,8 @@ artcoach/coach.py     Claude (vision + structured JSON output) → coaching feed
 | `artcoach/app.py` | Flask server and API routes |
 | `artcoach/scoring.py` | Stroke analysis engine |
 | `artcoach/exercises.py` | Exercise definitions (guide strokes + teaching notes) |
-| `artcoach/coach.py` | AI coach and offline fallback |
+| `artcoach/coach.py` | AI coach, style analysis, offline fallback |
+| `artcoach/styles.py` | Uploaded style references: storage + auto line tracing |
 | `artcoach/static/` | Drawing UI (HTML/CSS/JS, no build step) |
 | `tests/` | Scoring and fallback tests |
 
@@ -110,7 +128,7 @@ python simple_rag.py        # command line
 
 ## Roadmap
 
-- Upload your own reference image and auto-trace guide strokes from it
+- Multiple references per style, and feature-level drills generated from the style profile
 - Auto-align memory drawings (score shape even if drawn shifted or scaled)
 - More styles: manga inking, chibi proportions, gesture drawing with timed poses
 - Per-exercise progress charts and spaced-repetition practice plans

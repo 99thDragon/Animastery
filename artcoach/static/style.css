@@ -150,3 +150,66 @@ canvas {
 .fix { margin: 8px 0; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--bar-bg); border-radius: 0 8px 8px 0; }
 .fix .drill { font-size: 13.5px; }
 .spinner { color: var(--muted); font-style: italic; }
+
+.add-style {
+  width: 100%; margin-top: 6px; padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px dashed var(--accent); background: transparent; color: var(--accent); font-weight: 600;
+}
+.add-style:hover { background: var(--accent-soft); }
+.ref-controls { display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ref-controls input[type="range"] { width: 90px; }
+
+.style-guide { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+.style-guide h2 { font-size: 17px; margin: 0 0 4px; }
+.style-guide h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 14px 0 4px; }
+.style-guide p { margin: 4px 0; }
+.style-guide dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; }
+.style-guide dt { font-weight: 600; }
+.style-guide dd { margin: 0; color: var(--ink); }
+@media (max-width: 720px) { .style-guide dl { grid-template-columns: 1fr; } }
+.attribution { font-size: 13px; color: var(--muted); }
+.attribution a { color: var(--accent); }
+.plan { list-style: none; padding: 0; margin: 0; counter-reset: step; }
+.plan li { margin: 6px 0; }
+.plan button {
+  width: 100%; text-align: left; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  border-radius: 8px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px;
+}
+.plan button:hover { border-color: var(--accent); }
+.plan .step-title::before { counter-increment: step; content: counter(step) ". "; color: var(--accent); font-weight: 700; }
+.plan .step-title { font-weight: 600; }
+.plan .step-focus { font-size: 13px; color: var(--muted); }
+.callout { padding: 10px 12px; background: var(--bar-bg); border-radius: 8px; font-size: 14px; }
+.callout button, .danger {
+  margin-top: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+}
+.danger { color: var(--bad); }
+
+.upload-dialog {
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; width: min(520px, calc(100vw - 32px));
+  background: var(--panel); color: var(--ink);
+}
+.upload-dialog::backdrop { background: rgba(10, 8, 20, 0.5); }
+.upload-dialog h2 { margin: 0 0 6px; font-size: 20px; }
+.field { display: grid; gap: 4px; margin: 10px 0; font-size: 14px; font-weight: 600; }
+.field input[type="text"], .field input[type="url"] {
+  font: inherit; font-weight: 400; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+.drop {
+  border: 2px dashed var(--line); border-radius: 10px; padding: 18px; text-align: center;
+  font-weight: 400; color: var(--muted); cursor: pointer;
+}
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop input { display: none; }
+.ack { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; margin: 12px 0; }
+.ack input { margin-top: 3px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.dialog-actions button {
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600;
+}
+.dialog-actions .primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.dialog-actions .primary:disabled { opacity: 0.6; cursor: wait; }
+#up-status.error { color: var(--bad); }

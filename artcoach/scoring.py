@@ -98,32 +98,76 @@ def _wobble(samples):
 
 
 class _Guide:
-    """Pre-resampled guide strokes with cumulative arc length, for nearest-point queries."""
+    """Pre-resampled guide strokes with cumulative arc length, for nearest-point queries.
+
+    Segments are bucketed into a coarse grid so lookups stay fast even for
+    reference images with dozens of auto-traced strokes.
+    """
+
+    CELL = 16.0
 
     def __init__(self, strokes):
         self.strokes = []
-        for stroke in strokes:
+        self.segments = []   # (a, b, stroke_index, cum_a, cum_b, total)
+        for si, stroke in enumerate(strokes):
             pts = resample(stroke, GUIDE_SPACING)
             cum = [0.0]
             for i in range(1, len(pts)):
                 cum.append(cum[-1] + _dist(pts[i - 1], pts[i]))
             self.strokes.append((pts, cum))
+            total = cum[-1] or 1.0
+            if len(pts) == 1:
+                self.segments.append((pts[0], pts[0], si, 0.0, 0.0, total))
+            for i in range(len(pts) - 1):
+                self.segments.append((pts[i], pts[i + 1], si, cum[i], cum[i + 1], total))
+
+        self.buckets = defaultdict(list)
+        c = self.CELL
+        for idx, (a, b, *_rest) in enumerate(self.segments):
+            for gx in range(int(min(a[0], b[0]) // c), int(max(a[0], b[0]) // c) + 1):
+                for gy in range(int(min(a[1], b[1]) // c), int(max(a[1], b[1]) // c) + 1):
+                    self.buckets[(gx, gy)].append(idx)
+        if self.buckets:
+            xs = [k[0] for k in self.buckets]
+            ys = [k[1] for k in self.buckets]
+            self.bounds = (min(xs), max(xs), min(ys), max(ys))
+        else:
+            self.bounds = (0, 0, 0, 0)
+
+    def _ring(self, cx, cy, k):
+        if k == 0:
+            yield cx, cy
+            return
+        for dx in range(-k, k + 1):
+            yield cx + dx, cy - k
+            yield cx + dx, cy + k
+        for dy in range(-k + 1, k):
+            yield cx - k, cy + dy
+            yield cx + k, cy + dy
 
     def nearest(self, p):
         """Return (distance, stroke_index, fraction_along_stroke)."""
         best = (float("inf"), -1, 0.0)
-        for si, (pts, cum) in enumerate(self.strokes):
-            total = cum[-1] or 1.0
-            if len(pts) == 1:
-                d = _dist(p, pts[0])
-                if d < best[0]:
-                    best = (d, si, 0.0)
-                continue
-            for i in range(len(pts) - 1):
-                d, t = _point_segment(p, pts[i], pts[i + 1])
-                if d < best[0]:
-                    s = cum[i] + t * (cum[i + 1] - cum[i])
-                    best = (d, si, s / total)
+        if not self.segments:
+            return best
+        c = self.CELL
+        cx, cy = int(p[0] // c), int(p[1] // c)
+        x0, x1, y0, y1 = self.bounds
+        max_ring = max(abs(cx - x0), abs(cx - x1), abs(cy - y0), abs(cy - y1)) + 1
+        seen = set()
+        for k in range(max_ring + 1):
+            for key in self._ring(cx, cy, k):
+                for idx in self.buckets.get(key, ()):
+                    if idx in seen:
+                        continue
+                    seen.add(idx)
+                    a, b, si, ca, cb, total = self.segments[idx]
+                    d, t = _point_segment(p, a, b)
+                    if d < best[0]:
+                        best = (d, si, (ca + t * (cb - ca)) / total)
+            # Anything not yet checked lies in a cell at least k cells away.
+            if best[0] <= k * c:
+                break
         return best
 
 
@@ -213,9 +257,21 @@ def analyze(guide_strokes, attempt_strokes, *, pressure_profile=None,
         "label": "Coverage",
         "detail": f"You drew over {round(100 * coverage)}% of the guide.",
     }
+    skipped = defaultdict(list)   # guide line -> sections mostly skipped
     for (si, sec), miss in sorted(missed_sections.items()):
         if miss / section_totals[(si, sec)] > 0.6:
-            notes.append(f"The {sec} of guide line {si + 1} was mostly skipped.")
+            skipped[si].append(sec)
+    whole = [si for si, secs in skipped.items() if len(secs) == 3]
+    partial = [(si, secs) for si, secs in skipped.items() if len(secs) < 3]
+    if whole:
+        names = ", ".join(str(si + 1) for si in whole[:6]) + ("…" if len(whole) > 6 else "")
+        notes.append(f"{len(whole)} of {len(guide.strokes)} guide lines weren't drawn at all "
+                     f"({'lines' if len(whole) > 1 else 'line'} {names}).")
+    for si, secs in partial[:3]:
+        notes.append(f"The {' and '.join(sorted(secs, key=SECTION_NAMES.index))} of guide line "
+                     f"{si + 1} was mostly skipped.")
+    if len(partial) > 3:
+        notes.append(f"{len(partial) - 3} more line(s) were only partly drawn.")
 
     # ---- smoothness: wobble beyond the guide's own curvature
     # Measure the guide at the same spacing as the attempt so curvature cancels out.

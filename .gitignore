@@ -31,3 +31,5 @@ ENV/
 # OS specific files
 .DS_Store
 Thumbs.db 
+# Uploaded style references (local only)
+data/

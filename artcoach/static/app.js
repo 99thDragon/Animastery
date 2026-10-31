@@ -16,10 +16,24 @@
     showHeat: document.getElementById("show-heat"),
     countdown: document.getElementById("countdown"),
     penStatus: document.getElementById("pen-status"),
+    refControls: document.getElementById("ref-controls"),
+    refOpacity: document.getElementById("ref-opacity"),
+    showLines: document.getElementById("show-lines"),
+    styleGuide: document.getElementById("style-guide"),
+    dialog: document.getElementById("upload-dialog"),
+    upForm: document.getElementById("upload-form"),
+    upFile: document.getElementById("up-file"),
+    upStatus: document.getElementById("up-status"),
+    upSubmit: document.getElementById("up-submit"),
+    drop: document.getElementById("drop"),
+    dropText: document.getElementById("drop-text"),
   };
 
   const state = {
-    exercises: [],
+    exercises: [],        // built-in exercises
+    styles: [],           // uploaded style references (as exercises)
+    refImg: null,         // loaded reference image for a style exercise
+    previewing: false,    // memory-mode preview countdown running
     current: null,
     mode: "trace",
     strokes: [],          // [[x, y, t, pressure], ...] per stroke
@@ -66,7 +80,7 @@
     c.lineCap = "round";
     c.lineJoin = "round";
     c.strokeStyle = "rgba(90, 140, 230, 0.35)";
-    c.lineWidth = 6;
+    c.lineWidth = ex.style_id ? 3 : 6;
     for (const s of ex.strokes) {
       c.beginPath();
       s.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
@@ -125,7 +139,18 @@
     c.fillRect(0, 0, W, H);
     const ex = state.current;
     if (!ex) return;
-    if (state.guideVisible || forSnapshot) drawGuide(c, ex);
+    const showGuide = state.guideVisible || forSnapshot;
+    if (ex.style_id) {
+      if (showGuide && state.refImg && state.refImg.complete && state.refImg.naturalWidth) {
+        c.save();
+        c.globalAlpha = forSnapshot ? 0.35 : state.previewing ? 0.9 : Number(els.refOpacity.value) / 100;
+        c.drawImage(state.refImg, 0, 0, W, H);
+        c.restore();
+      }
+      if (showGuide && !forSnapshot && els.showLines.checked) drawGuide(c, ex);
+    } else if (showGuide) {
+      drawGuide(c, ex);
+    }
     drawInk(c, state.active ? [...state.strokes, state.active] : state.strokes);
     if (state.result && (els.showHeat.checked || forSnapshot)) drawHeat(c, state.result);
     if (!forSnapshot) {
@@ -136,8 +161,9 @@
 
   function drawHint(c) {
     if (state.strokes.length || state.active) return;
+    const target = state.current && state.current.style_id ? "the reference's lines" : "the blue lines";
     const text = state.guideVisible
-      ? (state.mode === "memory" ? "Memorize the shape…" : "Click and drag along the blue lines")
+      ? (state.mode === "memory" ? "Memorize the shape…" : `Click and drag along ${target}`)
       : "Now draw it from memory: click and drag";
     c.save();
     c.font = "600 18px system-ui, sans-serif";
@@ -221,10 +247,13 @@
   // ------------------------------------------------------------------ exercises
   function bestScores() { return store.get("animastery.best", {}); }
 
+  function allExercises() { return [...state.exercises, ...state.styles]; }
+
   function renderExerciseList() {
     const best = bestScores();
     const groups = {};
     for (const ex of state.exercises) (groups[ex.style] ||= []).push(ex);
+    groups["Your styles"] = state.styles;
     els.list.replaceChildren();
     for (const [style, list] of Object.entries(groups)) {
       const t = document.createElement("div");
@@ -246,10 +275,16 @@
         els.list.append(b);
       }
     }
+    const add = document.createElement("button");
+    add.className = "add-style";
+    add.textContent = "+ Learn a new style";
+    add.addEventListener("click", openUpload);
+    els.list.append(add);
   }
 
   function selectExercise(id) {
-    state.current = state.exercises.find((e) => e.id === id) || state.exercises[0];
+    const all = allExercises();
+    state.current = all.find((e) => e.id === id) || all[0];
     store.set("animastery.last", state.current.id);
     els.name.textContent = state.current.name;
     els.desc.textContent = state.current.description +
@@ -257,9 +292,198 @@
     els.tips.replaceChildren(...state.current.tips.map((t) => {
       const li = document.createElement("li"); li.textContent = t; return li;
     }));
+    els.refControls.hidden = !state.current.style_id;
+    state.refImg = null;
+    if (state.current.reference_image) {
+      const img = new Image();
+      img.onload = render;
+      img.src = state.current.reference_image;
+      state.refImg = img;
+    }
+    renderStyleGuide();
     resetAttempt();
     renderExerciseList();
   }
+
+  function setMode(mode) {
+    state.mode = mode;
+    document.querySelectorAll(".mode-btn").forEach((x) => {
+      const on = x.dataset.mode === mode;
+      x.classList.toggle("active", on);
+      x.setAttribute("aria-checked", String(on));
+    });
+    resetAttempt();
+  }
+
+  // ------------------------------------------------------------------ style guide (uploaded references)
+  function safeLink(url) {
+    try {
+      const u = new URL(url);
+      return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
+    } catch { return null; }
+  }
+
+  function renderStyleGuide() {
+    const ex = state.current;
+    if (!ex || !ex.style_id) { els.styleGuide.hidden = true; return; }
+    els.styleGuide.hidden = false;
+    const nodes = [el("h2", {}, "Style guide")];
+
+    const attr = el("p", { class: "attribution" });
+    attr.append(ex.artist ? `Reference by ${ex.artist}` : "Reference artist not given");
+    const href = safeLink(ex.source);
+    if (href) {
+      attr.append(" · ");
+      attr.append(el("a", { href, target: "_blank", rel: "noopener noreferrer" }, "source"));
+    }
+    attr.append(" · for personal study only");
+    nodes.push(attr);
+
+    const p = ex.profile;
+    if (!p) {
+      const msg = {
+        unavailable: "Claude's style breakdown needs an Anthropic API key. Set ANTHROPIC_API_KEY, restart the app, then press Analyze. You can already trace the reference below.",
+        disabled: "AI is turned off (ARTCOACH_AI=off). You can still trace the reference.",
+        declined: "Claude couldn't analyze this image. Try a different reference. You can still trace this one.",
+      }[ex.profile_source] || "This style hasn't been analyzed yet.";
+      const btn = el("button", {}, "Analyze with Claude");
+      btn.addEventListener("click", () => reanalyze(ex.style_id, btn));
+      nodes.push(el("div", { class: "callout" }, el("p", {}, msg), btn));
+    } else {
+      nodes.push(el("p", {}, p.style_summary));
+      const dl = el("dl");
+      for (const [label, key] of [["Line work", "line_work"], ["Shapes", "shape_language"],
+        ["Proportions", "proportions"], ["Color & shading", "color_and_shading"]]) {
+        dl.append(el("dt", {}, label), el("dd", {}, p[key]));
+      }
+      nodes.push(dl);
+      if (p.signature_features?.length) {
+        const ul = el("ul");
+        p.signature_features.forEach((f) => ul.append(el("li", {}, el("strong", {}, `${f.feature}: `), f.how_to_draw)));
+        nodes.push(el("h3", {}, "Signature features"), ul);
+      }
+      if (p.common_mistakes?.length) {
+        const ul = el("ul");
+        p.common_mistakes.forEach((m) => ul.append(el("li", {}, m)));
+        nodes.push(el("h3", {}, "Common mistakes"), ul);
+      }
+      if (p.lesson_plan?.length) {
+        const ol = el("ol", { class: "plan" });
+        for (const step of p.lesson_plan) {
+          const b = el("button", {},
+            el("span", { class: "step-title" }, step.title),
+            el("span", { class: "step-focus" }, `${planLabel(step.exercise)} · ${step.focus}`));
+          b.addEventListener("click", () => runPlanStep(ex, step.exercise));
+          ol.append(el("li", {}, b));
+        }
+        nodes.push(el("h3", {}, "Lesson plan"), ol);
+      }
+    }
+    const del = el("button", { class: "danger" }, "Delete this style");
+    del.addEventListener("click", () => deleteStyle(ex.style_id));
+    nodes.push(del);
+    els.styleGuide.replaceChildren(...nodes);
+  }
+
+  function planLabel(exId) {
+    if (exId === "reference-trace") return "Trace the reference";
+    if (exId === "reference-memory") return "Draw the reference from memory";
+    const ex = state.exercises.find((e) => e.id === exId);
+    return ex ? ex.name : exId;
+  }
+
+  function runPlanStep(styleEx, exId) {
+    if (exId === "reference-trace" || exId === "reference-memory") {
+      if (state.current.id !== styleEx.id) selectExercise(styleEx.id);
+      setMode(exId === "reference-trace" ? "trace" : "memory");
+    } else {
+      selectExercise(exId);
+    }
+    canvas.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function reanalyze(styleId, btn) {
+    btn.disabled = true;
+    btn.textContent = "Analyzing… (up to a minute)";
+    try {
+      const res = await fetch(`/api/styles/${styleId}/analyze`, { method: "POST" });
+      const updated = await res.json();
+      if (res.ok) upsertStyle(updated);
+    } finally {
+      if (state.current?.style_id === styleId) renderStyleGuide();
+    }
+  }
+
+  function upsertStyle(ex) {
+    const i = state.styles.findIndex((s) => s.id === ex.id);
+    if (i >= 0) state.styles[i] = ex; else state.styles.unshift(ex);
+    if (state.current?.id === ex.id) {
+      state.current = ex;
+      els.desc.textContent = ex.description;
+      els.tips.replaceChildren(...ex.tips.map((t) => el("li", {}, t)));
+    }
+    renderExerciseList();
+  }
+
+  async function deleteStyle(styleId) {
+    if (!confirm("Delete this style reference and its analysis?")) return;
+    await fetch(`/api/styles/${styleId}`, { method: "DELETE" });
+    state.styles = state.styles.filter((s) => s.style_id !== styleId);
+    selectExercise(state.exercises[0].id);
+  }
+
+  // ------------------------------------------------------------------ upload
+  function openUpload() {
+    els.upForm.reset();
+    els.dropText.textContent = "Choose an image or drop it here (PNG, JPG, WebP · max 8 MB)";
+    els.upStatus.textContent = "";
+    els.upStatus.className = "small";
+    els.dialog.showModal();
+  }
+
+  function setUploadFile(file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    els.upFile.files = dt.files;
+    els.dropText.textContent = file.name;
+  }
+
+  els.upFile.addEventListener("change", () => {
+    if (els.upFile.files[0]) els.dropText.textContent = els.upFile.files[0].name;
+  });
+  els.drop.addEventListener("dragover", (e) => { e.preventDefault(); els.drop.classList.add("over"); });
+  els.drop.addEventListener("dragleave", () => els.drop.classList.remove("over"));
+  els.drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    els.drop.classList.remove("over");
+    if (e.dataTransfer.files[0]) setUploadFile(e.dataTransfer.files[0]);
+  });
+  document.getElementById("up-cancel").addEventListener("click", () => els.dialog.close());
+
+  els.upForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!els.upFile.files[0]) {
+      els.upStatus.textContent = "Choose an image first.";
+      els.upStatus.className = "small error";
+      return;
+    }
+    els.upSubmit.disabled = true;
+    els.upStatus.className = "small";
+    els.upStatus.textContent = "Tracing the lines and asking Claude to break down the style… this can take up to a minute.";
+    try {
+      const res = await fetch("/api/styles", { method: "POST", body: new FormData(els.upForm) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed.");
+      upsertStyle(data);
+      els.dialog.close();
+      selectExercise(data.id);
+    } catch (err) {
+      els.upStatus.textContent = err.message || "Upload failed.";
+      els.upStatus.className = "small error";
+    } finally {
+      els.upSubmit.disabled = false;
+    }
+  });
 
   function clearResult() {
     state.result = null;
@@ -270,6 +494,7 @@
     state.strokes = [];
     state.active = null;
     state.result = null;
+    state.previewing = false;
     clearInterval(state.countdownTimer);
     els.countdown.hidden = true;
     showEmptyResults();
@@ -280,6 +505,7 @@
 
   function startMemoryPreview() {
     state.guideVisible = true;
+    state.previewing = true;
     let left = MEMORY_PREVIEW_MS / 1000;
     els.countdown.hidden = false;
     els.countdown.textContent = `Memorize… ${left}`;
@@ -289,6 +515,7 @@
         clearInterval(state.countdownTimer);
         els.countdown.hidden = true;
         state.guideVisible = false;
+        state.previewing = false;
         render();
       } else {
         els.countdown.textContent = `Memorize… ${left}`;
@@ -315,6 +542,7 @@
       if (!result.ok) { showMessage(result.error || "Couldn't score that attempt."); return; }
       state.result = result;
       state.guideVisible = true;   // reveal the guide for comparison
+      state.previewing = false;
       clearInterval(state.countdownTimer);
       els.countdown.hidden = true;
       recordAttempt(result.overall);
@@ -446,21 +674,17 @@
   document.getElementById("clear").addEventListener("click", resetAttempt);
   els.submit.addEventListener("click", submit);
   els.showHeat.addEventListener("change", render);
-  document.querySelectorAll(".mode-btn").forEach((b) => b.addEventListener("click", () => {
-    state.mode = b.dataset.mode;
-    document.querySelectorAll(".mode-btn").forEach((x) => {
-      x.classList.toggle("active", x === b);
-      x.setAttribute("aria-checked", String(x === b));
-    });
-    resetAttempt();
-  }));
+  els.refOpacity.addEventListener("input", render);
+  els.showLines.addEventListener("change", render);
+  document.querySelectorAll(".mode-btn").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
   window.addEventListener("resize", resizeCanvas);
 
   // ------------------------------------------------------------------ boot
   (async () => {
     resizeCanvas();
-    const res = await fetch("/api/exercises");
-    state.exercises = await res.json();
+    const [exRes, styleRes] = await Promise.all([fetch("/api/exercises"), fetch("/api/styles")]);
+    state.exercises = await exRes.json();
+    state.styles = styleRes.ok ? await styleRes.json() : [];
     selectExercise(store.get("animastery.last", null) || state.exercises[0].id);
   })();
 })();

@@ -36,11 +36,16 @@
         <button id="undo">Undo</button>
         <button id="clear">Clear</button>
         <label class="toggle"><input type="checkbox" id="show-heat" checked> Error heatmap</label>
+        <span class="ref-controls" id="ref-controls" hidden>
+          <label class="toggle">Reference <input type="range" id="ref-opacity" min="0" max="100" value="35"></label>
+          <label class="toggle"><input type="checkbox" id="show-lines"> Traced lines</label>
+        </span>
         <span id="pen-status" class="muted small"></span>
         <button id="submit" class="primary">Check my lines</button>
       </div>
 
       <ul id="ex-tips" class="tips"></ul>
+      <div id="style-guide" class="style-guide" hidden></div>
     </section>
 
     <aside class="results" id="results">
@@ -50,6 +55,29 @@
       </div>
     </aside>
   </main>
+
+  <dialog id="upload-dialog" class="upload-dialog">
+    <form id="upload-form" method="dialog">
+      <h2>Learn a new style</h2>
+      <p class="muted small">Upload artwork in the style you want to learn. Clean line art or sketches work
+        best. Claude breaks down how the style is drawn and builds you a lesson plan, and the
+        reference's lines become a tracing exercise.</p>
+      <label class="field drop" id="drop">
+        <input type="file" id="up-file" name="image" accept="image/png,image/jpeg,image/webp" required>
+        <span id="drop-text">Choose an image or drop it here (PNG, JPG, WebP · max 8 MB)</span>
+      </label>
+      <label class="field">Style name <input type="text" name="name" maxlength="80" placeholder="e.g. Soft idol anime" required></label>
+      <label class="field">Artist / creator <input type="text" name="artist" maxlength="80" placeholder="Who made it?"></label>
+      <label class="field">Source link <input type="url" name="source" maxlength="300" placeholder="https://… (where you found it)"></label>
+      <label class="ack"><input type="checkbox" name="study_ack" value="yes" required>
+        This is for my personal study. I'll credit the artist and won't post traces or copies as my own original work.</label>
+      <p id="up-status" class="small" role="status"></p>
+      <div class="dialog-actions">
+        <button type="button" id="up-cancel">Cancel</button>
+        <button type="submit" id="up-submit" class="primary">Upload &amp; analyze</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="/static/app.js"></script>
 </body>

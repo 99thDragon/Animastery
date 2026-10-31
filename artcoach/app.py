@@ -9,13 +9,21 @@ import os
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from . import coach, exercises, scoring
+from . import coach, exercises, scoring, styles
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 MAX_POINTS = 20000
 
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="/static")
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+
+
+def resolve_exercise(exercise_id):
+    """Built-in exercise, or an uploaded style reference ("style:<id>")."""
+    if isinstance(exercise_id, str) and exercise_id.startswith("style:"):
+        meta = styles.load(exercise_id.split(":", 1)[1])
+        return styles.as_exercise(meta) if meta else None
+    return exercises.get_exercise(exercise_id)
 
 
 @app.get("/")
@@ -26,6 +34,65 @@ def index():
 @app.get("/api/exercises")
 def list_exercises():
     return jsonify(exercises.public_list())
+
+
+# --------------------------------------------------------------------------- style references
+
+@app.get("/api/styles")
+def list_styles():
+    return jsonify([styles.as_exercise(m) for m in styles.list_all()])
+
+
+@app.post("/api/styles")
+def upload_style():
+    f = request.files.get("image")
+    if not f:
+        return jsonify({"error": "Choose an image to upload."}), 400
+    if request.form.get("study_ack") != "yes":
+        return jsonify({"error": "Please confirm the reference is for personal study."}), 400
+    try:
+        meta = styles.create(f.read(styles.MAX_UPLOAD_BYTES + 1), request.form.get("name"),
+                             request.form.get("artist"), request.form.get("source"))
+    except styles.StyleError as exc:
+        return jsonify({"error": str(exc)}), 400
+    _analyze(meta)
+    return jsonify(styles.as_exercise(meta))
+
+
+def _analyze(meta):
+    profile, source = coach.analyze_style(styles.image_bytes(meta["id"]), meta["name"],
+                                          meta.get("artist"), exercises.EXERCISES)
+    meta["profile"], meta["profile_source"] = profile, source
+    styles.save(meta)
+
+
+@app.post("/api/styles/<style_id>/analyze")
+def reanalyze_style(style_id):
+    meta = styles.load(style_id)
+    if not meta:
+        return jsonify({"error": "Unknown style."}), 404
+    _analyze(meta)
+    return jsonify(styles.as_exercise(meta))
+
+
+@app.get("/api/styles/<style_id>/image")
+def style_image(style_id):
+    try:
+        path = styles.image_path(style_id)
+    except styles.StyleError:
+        return jsonify({"error": "Unknown style."}), 404
+    if not path.exists():
+        return jsonify({"error": "Unknown style."}), 404
+    return send_from_directory(path.parent, path.name, mimetype="image/png")
+
+
+@app.delete("/api/styles/<style_id>")
+def delete_style(style_id):
+    try:
+        ok = styles.delete(style_id)
+    except styles.StyleError:
+        ok = False
+    return (jsonify({"ok": True}), 200) if ok else (jsonify({"error": "Unknown style."}), 404)
 
 
 def _parse_strokes(raw):
@@ -47,7 +114,7 @@ def _parse_strokes(raw):
 @app.post("/api/score")
 def score():
     body = request.get_json(silent=True) or {}
-    ex = exercises.get_exercise(body.get("exercise_id"))
+    ex = resolve_exercise(body.get("exercise_id"))
     if not ex:
         return jsonify({"ok": False, "error": "Unknown exercise."}), 404
     try:
@@ -65,7 +132,7 @@ def score():
 @app.post("/api/coach")
 def coach_feedback():
     body = request.get_json(silent=True) or {}
-    ex = exercises.get_exercise(body.get("exercise_id"))
+    ex = resolve_exercise(body.get("exercise_id"))
     result = body.get("result")
     if not ex or not isinstance(result, dict):
         return jsonify({"error": "Missing exercise or result."}), 400
