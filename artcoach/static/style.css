@@ -96,7 +96,9 @@ button { font: inherit; }
 canvas {
   display: block; width: 100%; height: auto; aspect-ratio: 4 / 3;
   background: #fffdf8; border-radius: 10px; border: 1px solid var(--line);
-  touch-action: none; cursor: crosshair;
+  touch-action: none;
+  /* High-contrast ring cursor (white halo + pink ring + dot) so it's visible on the light paper. */
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='7' fill='none' stroke='white' stroke-width='4'/%3E%3Ccircle cx='12' cy='12' r='7' fill='none' stroke='%23e8508f' stroke-width='2'/%3E%3Ccircle cx='12' cy='12' r='2' fill='%231d1b2b' stroke='white' stroke-width='1'/%3E%3C/svg%3E") 12 12, crosshair;
 }
 .countdown {
   position: absolute; top: 12px; right: 12px;

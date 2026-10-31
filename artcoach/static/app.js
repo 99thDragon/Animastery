@@ -28,6 +28,7 @@
     result: null,
     countdownTimer: null,
     sawPressure: false,
+    hover: null,          // [x, y] of a hovering mouse/pen, for the on-canvas cursor ring
   };
 
   // ------------------------------------------------------------------ storage (best-effort)
@@ -127,6 +128,38 @@
     if (state.guideVisible || forSnapshot) drawGuide(c, ex);
     drawInk(c, state.active ? [...state.strokes, state.active] : state.strokes);
     if (state.result && (els.showHeat.checked || forSnapshot)) drawHeat(c, state.result);
+    if (!forSnapshot) {
+      drawHint(c);
+      drawCursor(c);
+    }
+  }
+
+  function drawHint(c) {
+    if (state.strokes.length || state.active) return;
+    const text = state.guideVisible
+      ? (state.mode === "memory" ? "Memorize the shape…" : "Click and drag along the blue lines")
+      : "Now draw it from memory: click and drag";
+    c.save();
+    c.font = "600 18px system-ui, sans-serif";
+    c.textAlign = "center";
+    c.fillStyle = "rgba(29, 27, 43, 0.45)";
+    c.fillText(text, W / 2, 40);
+    c.restore();
+  }
+
+  function drawCursor(c) {
+    if (!state.hover) return;
+    const [x, y] = state.hover;
+    c.save();
+    c.lineWidth = 4;
+    c.strokeStyle = "rgba(255, 255, 255, 0.9)";
+    c.beginPath(); c.arc(x, y, 9, 0, Math.PI * 2); c.stroke();
+    c.lineWidth = 2;
+    c.strokeStyle = "#e8508f";
+    c.beginPath(); c.arc(x, y, 9, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = "#1d1b2b";
+    c.beginPath(); c.arc(x, y, 2, 0, Math.PI * 2); c.fill();
+    c.restore();
   }
 
   function render() { paint(ctx); }
@@ -157,7 +190,8 @@
   });
 
   canvas.addEventListener("pointermove", (e) => {
-    if (!state.active) return;
+    state.hover = e.pointerType === "touch" ? null : toLogical(e);
+    if (!state.active) { render(); return; }
     const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
     for (const ev of events.length ? events : [e]) state.active.push(pointFrom(ev));
     render();
@@ -171,6 +205,11 @@
   }
   canvas.addEventListener("pointerup", endStroke);
   canvas.addEventListener("pointercancel", endStroke);
+  canvas.addEventListener("pointerleave", () => {
+    if (state.active) return;   // pointer capture keeps the stroke going
+    state.hover = null;
+    render();
+  });
 
   function updatePenStatus(e) {
     const label = e.pointerType === "pen"
